@@ -1,9 +1,12 @@
 package hu.unideb.inf.smartflastlight;
 
+import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraManager;
 import android.os.Bundle;
 import android.widget.TextView;
 
@@ -13,15 +16,16 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     SensorManager sensorManager;
     Sensor flashlightSensor;
     SensorEventListener flashlightEventListener;
     TextView lightText;
-    private long lastTime = 0;
-
+    long lastTime = 0;
+    boolean isFlashOn = false;    
+    CameraManager cameraManager;
+    String cameraId;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -34,9 +38,9 @@ public class MainActivity extends AppCompatActivity {
         });
 
         lightText = findViewById(R.id.lightText);
+        
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         flashlightSensor = sensorManager.getDefaultSensor((Sensor.TYPE_ACCELEROMETER));
-
         if (flashlightSensor != null){
             flashlightEventListener = new SensorEventListener() {
             @Override
@@ -49,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
                     if (acceleration > 12){
                         if((timeNow - lastTime) > 1000){
                             lastTime = timeNow;
-                            lightText.setText("Shake detected! Light On");
+                            toggleFlashlight();
                         }
                     }
                 }
@@ -66,19 +70,44 @@ public class MainActivity extends AppCompatActivity {
         } else {
             lightText.setText("Accelerometer not available");
         }
+        
+        cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        try {
+            cameraId = cameraManager.getCameraIdList()[0];
+        } catch (CameraAccessException e) {
+            throw new RuntimeException(e);
+        }
+        
+
+    }
+    private void toggleFlashlight(){
+        try {
+            if (cameraManager != null && cameraId != null){
+                isFlashOn = !isFlashOn;
+                cameraManager.setTorchMode(cameraId,isFlashOn);
+                lightText.setText("FlashLight " + (isFlashOn ? "ON" : "OFF"));
+
+            }
+        } catch (CameraAccessException e){
+            e.printStackTrace();
+        }
 
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        sensorManager.registerListener(flashlightEventListener, flashlightSensor,SensorManager.SENSOR_DELAY_NORMAL);
+        if (sensorManager != null) {
+            sensorManager.registerListener(flashlightEventListener, flashlightSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        sensorManager.unregisterListener(flashlightEventListener);
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(flashlightEventListener);
+        }
     }
 
 
